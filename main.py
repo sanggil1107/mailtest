@@ -14,7 +14,7 @@ app = FastAPI()
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 API_KEY = os.getenv("API_KEY")
-
+GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 TENANT_ID = "consumers"
 
@@ -175,7 +175,7 @@ def get_mails(
         "mails": mails
     }
 
-GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
 
 # ==============================
 # 🔑 토큰 로드
