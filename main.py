@@ -24,7 +24,7 @@ REDIRECT_URI = os.getenv("REDIRECT_URI")
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES = ["Mail.Read", "User.Read"]
 
-TOKEN_FILE = "token.json"
+TOKEN_FILE = "/tmp/token.json"
 
 session = requests.Session()
 session.verify = False
