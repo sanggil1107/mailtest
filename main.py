@@ -37,7 +37,6 @@ msal_app = msal.ConfidentialClientApplication(
 @app.get("/")
 def login():
 
-
     auth_url = msal_app.get_authorization_request_url(
         SCOPES,
         redirect_uri=REDIRECT_URI,
@@ -49,12 +48,6 @@ def login():
 # 2. 로그인 후 callback
 @app.get("/callback")
 def callback(code: str):
-    msal_app = msal.ConfidentialClientApplication(
-        CLIENT_ID,
-        authority=AUTHORITY,
-        client_credential=CLIENT_SECRET
-    )
-
     token = msal_app.acquire_token_by_authorization_code(
         code,
         scopes=SCOPES,
@@ -98,14 +91,28 @@ def get_mails(x_api_key: str = Header(None)):
         "Authorization": f"Bearer {token['access_token']}"
     }
 
-    url = "https://graph.microsoft.com/v1.0/me/messages?$top=5"
+    url = "https://graph.microsoft.com/v1.0/me/messages?$top=5&orderby=receivedDateTime desc&select=subject,bodyPreview,receivedDateTime,from"
 
-    res = requests.get(url, headers=headers)
+    res = requests.get(url, headers=headers,verify=certifi.where(),timeout=30)
 
     if res.status_code != 200:
         raise HTTPException(status_code=500, detail=res.text)
 
-    return res.json()
+    data = res.json()
+
+    mails = []
+    for item in data.get("value", []):
+        mails.append({
+            "subject": item.get("subject", ""),
+            "bodyPreview": item.get("bodyPreview", ""),
+            "receivedDateTime": item.get("receivedDateTime", ""),
+            "from": item.get("from", {}).get("emailAddress", {}).get("address", "")
+        })
+
+    return {
+        "count": len(mails),
+        "mails": mails
+    }
 
     # # 3. 메일 가져오기
     # url = "https://graph.microsoft.com/v1.0/me/messages?$top=2&$orderby=receivedDateTime desc&select=subject,bodyPreview"
