@@ -3,7 +3,6 @@ from fastapi.responses import RedirectResponse
 import msal
 import requests
 import certifi
-from openai import OpenAI
 import json
 import os
 import time
