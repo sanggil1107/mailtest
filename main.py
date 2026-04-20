@@ -175,6 +175,152 @@ def get_mails(
         "mails": mails
     }
 
+GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+# ==============================
+# 🔑 토큰 로드
+# ==============================
+def load_access_token():
+    if not os.path.exists("token.json"):
+        raise Exception("❌ token.json 파일이 없습니다 (Railway에 없음 가능성)")
+
+    with open("token.json", "r", encoding="utf-8") as f:
+        token_data = json.load(f)
+
+    access_token = token_data.get("access_token")
+
+    if not access_token:
+        raise Exception("❌ access_token 이 없습니다")
+
+    return access_token
+
+
+# ==============================
+# 📡 Graph API 공통 호출
+# ==============================
+def graph_get(url, access_token, params=None):
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json"
+    }
+
+    res = requests.get(url, headers=headers, params=params, timeout=30)
+    return res
+
+
+# ==============================
+# 🧪 1. token.json 존재 확인
+# ==============================
+@app.get("/debug/token")
+def debug_token():
+    return {
+        "exists": os.path.exists("token.json"),
+        "cwd": os.getcwd(),
+        "files": os.listdir(".")
+    }
+
+
+# ==============================
+# 🧪 2. 로그인 계정 확인
+# ==============================
+@app.get("/debug/me")
+def debug_me():
+    try:
+        access_token = load_access_token()
+
+        res = graph_get(f"{GRAPH_BASE}/me", access_token)
+
+        return {
+            "status_code": res.status_code,
+            "response": res.json() if res.status_code == 200 else res.text
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================
+# 🧪 3. 받은편지함 정보 확인
+# ==============================
+@app.get("/debug/inbox")
+def debug_inbox():
+    try:
+        access_token = load_access_token()
+
+        res = graph_get(f"{GRAPH_BASE}/me/mailFolders/inbox", access_token)
+
+        return {
+            "status_code": res.status_code,
+            "response": res.json() if res.status_code == 200 else res.text
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================
+# 🧪 4. 최신 메일 5건
+# ==============================
+@app.get("/debug/mails")
+def debug_mails():
+    try:
+        access_token = load_access_token()
+
+        params = {
+            "$top": 5,
+            "$orderby": "receivedDateTime DESC",
+            "$select": "id,subject,from,receivedDateTime,bodyPreview"
+        }
+
+        res = graph_get(
+            f"{GRAPH_BASE}/me/mailFolders/inbox/messages",
+            access_token,
+            params
+        )
+
+        return {
+            "status_code": res.status_code,
+            "count": len(res.json().get("value", [])) if res.status_code == 200 else 0,
+            "response": res.json() if res.status_code == 200 else res.text
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==============================
+# 🧪 5. 특정 발신자 메일 2건
+# ==============================
+@app.get("/debug/mails/by-sender")
+def debug_mails_by_sender(sender_email: str):
+    try:
+        access_token = load_access_token()
+
+        params = {
+            "$top": 10,
+            "$orderby": "receivedDateTime DESC",
+            "$select": "id,subject,from,receivedDateTime",
+            "$filter": f"from/emailAddress/address eq '{sender_email}'"
+        }
+
+        res = graph_get(
+            f"{GRAPH_BASE}/me/mailFolders/inbox/messages",
+            access_token,
+            params
+        )
+
+        data = res.json() if res.status_code == 200 else {}
+
+        return {
+            "status_code": res.status_code,
+            "count": len(data.get("value", [])[:2]),
+            "mails": data.get("value", [])[:2],
+            "raw": data if res.status_code == 200 else res.text
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     # # 3. 메일 가져오기
     # url = "https://graph.microsoft.com/v1.0/me/messages?$top=2&$orderby=receivedDateTime desc&select=subject,bodyPreview"
     # res = requests.get(
