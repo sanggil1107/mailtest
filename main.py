@@ -79,7 +79,7 @@ def get_token():
     return token  
 
 
-@app.get("/mails")
+@app.get("/mail")
 def get_mails(x_api_key: str = Header(None)):
     # 🔐 API Key 체크 (헤더 방식)
     if x_api_key != API_KEY:
@@ -108,6 +108,67 @@ def get_mails(x_api_key: str = Header(None)):
             "receivedDateTime": item.get("receivedDateTime", ""),
             "from": item.get("from", {}).get("emailAddress", {}).get("address", "")
         })
+
+    return {
+        "count": len(mails),
+        "mails": mails
+    }
+
+
+@app.get("/mails")
+def get_mails(
+    x_api_key: str = Header(None),
+    sender: str = None,
+    top: int = 20
+):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    token = get_token()
+
+    headers = {
+        "Authorization": f"Bearer {token['access_token']}"
+    }
+
+    # ✅ Inbox만 조회
+    url = (
+        "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages"
+        f"?$top={top}"
+        "&$orderby=receivedDateTime desc"
+        "&$select=id,subject,bodyPreview,receivedDateTime,from"
+    )
+
+    res = requests.get(
+        url,
+        headers=headers,
+        verify=certifi.where(),
+        timeout=30
+    )
+
+    if res.status_code != 200:
+        raise HTTPException(status_code=500, detail=res.text)
+
+    data = res.json()
+
+    mails = []
+    for item in data.get("value", []):
+        mails.append({
+            "id": item.get("id", ""),
+            "subject": item.get("subject", ""),
+            "bodyPreview": item.get("bodyPreview", ""),
+            "receivedDateTime": item.get("receivedDateTime", ""),
+            "from": item.get("from", {}).get("emailAddress", {}).get("address", "")
+        })
+
+    # ✅ 발신자 필터
+    if sender:
+        mails = [
+            m for m in mails
+            if sender.lower() in (m.get("from", "") or "").lower()
+        ]
+
+    # ✅ 2건만 선택
+    mails = mails[:2]
 
     return {
         "count": len(mails),
